@@ -19,6 +19,16 @@ class CReserveKey;
 
 #include "util.h"
 
+class AcceptedConnection
+{
+public:
+    virtual ~AcceptedConnection() {}
+
+    virtual std::iostream& stream() = 0;
+    virtual std::string peer_address_to_string() const = 0;
+    virtual void close() = 0;
+};
+
 // HTTP status codes
 enum HTTPStatusCode
 {
@@ -132,6 +142,10 @@ extern double GetDifficulty(const CBlockIndex* blockindex = NULL);
 extern std::string HexBits(unsigned int nBits);
 extern std::string HelpRequiringPassphrase();
 extern void EnsureWalletIsUnlocked();
+
+extern std::string HTTPReply(int nStatus, const std::string& strMsg,
+                             bool keepalive, bool headerOnly = false,
+                             const char *contentType = "application/json");
 
 extern json_spirit::Value getconnectioncount(const json_spirit::Array& params, bool fHelp); // in rpcnet.cpp
 extern json_spirit::Value getpeerinfo(const json_spirit::Array& params, bool fHelp);
