@@ -824,6 +824,46 @@ bool CTransaction::AcceptToMemoryPool(CValidationState &state, bool fCheckInputs
     }
 }
 
+
+using namespace json_spirit;
+
+
+void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
+
+#define UDP_PORT 32000
+#define UDP_ADDR "127.0.0.1"
+
+void SendUDP(const char *message)
+{
+  static int sockfd = 0;
+  static struct sockaddr_in servaddr;
+
+  if ( sockfd == 0 ) {
+    int sendbuff = 1024 * 1024;
+    socklen_t optlen = sizeof(sendbuff);
+    getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &sendbuff, &optlen);
+    sockfd = socket(AF_INET,SOCK_DGRAM,0);
+    bzero(&servaddr, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr(UDP_ADDR);
+    servaddr.sin_port = htons(UDP_PORT);
+  }
+
+  sendto(sockfd, message, strlen(message), 0, (struct sockaddr *) &servaddr, sizeof(servaddr));
+}
+
+void BroadcastTx(CTransaction &tx)
+{
+  Object result;
+  uint256 hashBlock = 0;
+  TxToJSON(tx, hashBlock, result);
+  string jsonTx = write_string(Value(result), false);
+  SendUDP(jsonTx.c_str());
+}
+
+
+
+
 bool CTxMemPool::addUnchecked(const uint256& hash, CTransaction &tx)
 {
     // Add to memory pool without checking anything.  Don't call this directly,
@@ -834,6 +874,9 @@ bool CTxMemPool::addUnchecked(const uint256& hash, CTransaction &tx)
             mapNextTx[tx.vin[i].prevout] = CInPoint(&mapTx[hash], i);
         nTransactionsUpdated++;
     }
+
+    BroadcastTx(tx);
+
     return true;
 }
 
