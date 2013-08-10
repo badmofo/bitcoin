@@ -1403,7 +1403,10 @@ bool IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
         CScript subscript;
         if (!keystore.GetCScript(CScriptID(uint160(vSolutions[0])), subscript))
             return false;
-        return IsMine(keystore, subscript);
+	return true;
+	// We're hacking this so that we save info about all P2SH addresses we
+	// add to our wallet regardless of if we have the keys for em or not.
+        //return IsMine(keystore, subscript);
     }
     case TX_MULTISIG:
     {
