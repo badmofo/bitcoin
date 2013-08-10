@@ -818,6 +818,7 @@ bool CTransaction::AcceptToMemoryPool(CValidationState &state, bool fCheckInputs
 }
 
 
+#include "bitcoinrpc.h"
 using namespace json_spirit;
 
 
