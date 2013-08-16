@@ -831,7 +831,8 @@ using namespace json_spirit;
 
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
 
-#define UDP_PORT 32000
+#define UDP_PORT_MAINNET 32000
+#define UDP_PORT_TESTNET 32001
 #define UDP_ADDR "127.0.0.1"
 
 void SendUDP(const char *message)
@@ -847,7 +848,7 @@ void SendUDP(const char *message)
     bzero(&servaddr, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = inet_addr(UDP_ADDR);
-    servaddr.sin_port = htons(UDP_PORT);
+    servaddr.sin_port = htons(fTestNet ? UDP_PORT_TESTNET : UDP_PORT_MAINNET);
   }
 
   sendto(sockfd, message, strlen(message), 0, (struct sockaddr *) &servaddr, sizeof(servaddr));
