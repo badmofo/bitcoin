@@ -27,6 +27,7 @@ LIBS= \
   $(CURDIR)/leveldb/libleveldb.a $(CURDIR)/leveldb/libmemenv.a \
  -l boost_system-mt-s \
  -l boost_filesystem-mt-s \
+ -l boost_regex-mt-s \
  -l boost_program_options-mt-s \
  -l boost_thread_win32-mt-s \
  -l boost_chrono-mt-s \
@@ -76,6 +77,7 @@ OBJS= \
     obj/net.o \
     obj/protocol.o \
     obj/bitcoinrpc.o \
+    obj/rest.o \
     obj/rpcdump.o \
     obj/rpcnet.o \
     obj/rpcmining.o \

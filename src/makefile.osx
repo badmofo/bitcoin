@@ -33,6 +33,7 @@ TESTLIBS += \
 LIBS += \
  $(DEPSDIR)/lib/db48/libdb_cxx-4.8.a \
  $(DEPSDIR)/lib/libboost_system-mt.a \
+ $(DEPSDIR)/lib/libboost_regex-mt.a \
  $(DEPSDIR)/lib/libboost_filesystem-mt.a \
  $(DEPSDIR)/lib/libboost_program_options-mt.a \
  $(DEPSDIR)/lib/libboost_thread-mt.a \
@@ -46,6 +47,7 @@ TESTLIBS += \
 LIBS += \
  -ldb_cxx-4.8 \
  -lboost_system-mt \
+ -lboost_regex-mt \
  -lboost_filesystem-mt \
  -lboost_program_options-mt \
  -lboost_thread-mt \
@@ -87,6 +89,7 @@ OBJS= \
     obj/net.o \
     obj/protocol.o \
     obj/bitcoinrpc.o \
+    obj/rest.o \
     obj/rpcdump.o \
     obj/rpcnet.o \
     obj/rpcmining.o \

@@ -35,6 +35,7 @@ LIBS= \
  -l leveldb \
  -l memenv \
  -l boost_system$(BOOST_SUFFIX) \
+ -l boost_regex$(BOOST_SUFFIX) \
  -l boost_filesystem$(BOOST_SUFFIX) \
  -l boost_program_options$(BOOST_SUFFIX) \
  -l boost_thread$(BOOST_SUFFIX) \
@@ -84,6 +85,7 @@ OBJS= \
     obj/net.o \
     obj/protocol.o \
     obj/bitcoinrpc.o \
+    obj/rest.o \
     obj/rpcdump.o \
     obj/rpcnet.o \
     obj/rpcmining.o \
