@@ -1025,8 +1025,15 @@ void ServiceConnection(AcceptedConnection *conn)
         if (mapHeaders["connection"] == "close")
             fRun = false;
 
+        // Process via JSON-RPC API
         if (strURI == "/") {
             if (!HTTPReq_JSONRPC(conn, strRequest, mapHeaders, fRun))
+                break;
+        }
+
+        // Process via HTTP REST API
+        else if (strURI.substr(0, 6) == "/rest/") {
+            if (!HTTPReq_REST(conn, strURI, mapHeaders, fRun))
                 break;
         }
         
