@@ -8,21 +8,17 @@
 #include "bitcoingui.h"
 #include "walletstack.h"
 
-#include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QMessageBox>
 
-#include <stdio.h>
-
 WalletFrame::WalletFrame(BitcoinGUI *_gui) :
-    QFrame(_gui),
-    gui(_gui),
-    clientModel(0)
+    QFrame(_gui)
 {
     // Leave HBox hook for adding a list view later
     QHBoxLayout *walletFrameLayout = new QHBoxLayout(this);
     setContentsMargins(0,0,0,0);
     walletStack = new WalletStack(this);
-    walletStack->setBitcoinGUI(gui);
+    walletStack->setBitcoinGUI(_gui);
     walletFrameLayout->setContentsMargins(0,0,0,0);
     walletFrameLayout->addWidget(walletStack);
 }
@@ -33,8 +29,8 @@ WalletFrame::~WalletFrame()
 
 void WalletFrame::setClientModel(ClientModel *clientModel)
 {
-    this->clientModel = clientModel;
-    walletStack->setClientModel(clientModel);
+    if (clientModel)
+        walletStack->setClientModel(clientModel);
 }
 
 bool WalletFrame::addWallet(const QString& name, WalletModel *walletModel)
@@ -45,8 +41,7 @@ bool WalletFrame::addWallet(const QString& name, WalletModel *walletModel)
 bool WalletFrame::setCurrentWallet(const QString& name)
 {
     // TODO: Check if valid name
-    walletStack->setCurrentWallet(name);
-    return true;
+    return walletStack->setCurrentWallet(name);
 }
 
 void WalletFrame::removeAllWallets()
@@ -54,9 +49,9 @@ void WalletFrame::removeAllWallets()
     walletStack->removeAllWallets();
 }
 
-bool WalletFrame::handleURI(const QString &uri)
+bool WalletFrame::handlePaymentRequest(const SendCoinsRecipient &recipient)
 {
-    return walletStack->handleURI(uri);
+    return walletStack->handlePaymentRequest(recipient);
 }
 
 void WalletFrame::showOutOfSyncWarning(bool fShow)

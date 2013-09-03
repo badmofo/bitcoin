@@ -13,8 +13,6 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/resource.h>
-#else
-typedef int pid_t; /* define for Windows compatibility */
 #endif
 #include <map>
 #include <list>
@@ -22,6 +20,7 @@ typedef int pid_t; /* define for Windows compatibility */
 #include <vector>
 #include <string>
 
+#include <boost/version.hpp>
 #include <boost/thread.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
@@ -36,7 +35,6 @@ typedef unsigned long long  uint64;
 static const int64 COIN = 100000000;
 static const int64 CENT = 1000000;
 
-#define loop                for (;;)
 #define BEGIN(a)            ((char*)&(a))
 #define END(a)              ((char*)&((&(a))[1]))
 #define UBEGIN(a)           ((unsigned char*)&(a))
@@ -103,10 +101,18 @@ T* alignup(T* p)
 #else
 #define MAX_PATH            1024
 #endif
+// As Solaris does not have the MSG_NOSIGNAL flag for send(2) syscall, it is defined as 0
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
 
 inline void MilliSleep(int64 n)
 {
-#if BOOST_VERSION >= 105000
+// Boost's sleep_for was uninterruptable when backed by nanosleep from 1.50
+// until fixed in 1.52. Use the deprecated sleep method for the broken case.
+// See: https://svn.boost.org/trac/boost/ticket/7238
+
+#if BOOST_VERSION >= 105000 && (!defined(BOOST_HAS_NANOSLEEP) || BOOST_VERSION >= 105200)
     boost::this_thread::sleep_for(boost::chrono::milliseconds(n));
 #else
     boost::this_thread::sleep(boost::posix_time::milliseconds(n));
@@ -140,7 +146,6 @@ extern bool fDaemon;
 extern bool fServer;
 extern bool fCommandLine;
 extern std::string strMiscWarning;
-extern bool fTestNet;
 extern bool fNoListen;
 extern bool fLogTimestamps;
 extern volatile bool fReopenDebugLog;
@@ -206,7 +211,9 @@ boost::filesystem::path GetDefaultDataDir();
 const boost::filesystem::path &GetDataDir(bool fNetSpecific = true);
 boost::filesystem::path GetConfigFile();
 boost::filesystem::path GetPidFile();
+#ifndef WIN32
 void CreatePidFile(const boost::filesystem::path &path, pid_t pid);
+#endif
 void ReadConfigFile(std::map<std::string, std::string>& mapSettingsRet, std::map<std::string, std::vector<std::string> >& mapMultiSettingsRet);
 #ifdef WIN32
 boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
@@ -300,7 +307,8 @@ std::string HexStr(const T itbegin, const T itend, bool fSpaces=false)
     return rv;
 }
 
-inline std::string HexStr(const std::vector<unsigned char>& vch, bool fSpaces=false)
+template<typename T>
+inline std::string HexStr(const T& vch, bool fSpaces=false)
 {
     return HexStr(vch.begin(), vch.end(), fSpaces);
 }
@@ -391,7 +399,7 @@ int64 GetArg(const std::string& strArg, int64 nDefault);
  * @param default (true or false)
  * @return command-line argument or default value
  */
-bool GetBoolArg(const std::string& strArg, bool fDefault=false);
+bool GetBoolArg(const std::string& strArg, bool fDefault);
 
 /**
  * Set an argument if it doesn't already have a value
@@ -432,6 +440,21 @@ static inline uint32_t insecure_rand(void)
  * @param Deterministic Use a determinstic seed
  */
 void seed_insecure_rand(bool fDeterministic=false);
+
+/**
+ * Timing-attack-resistant comparison.
+ * Takes time proportional to length
+ * of first argument.
+ */
+template <typename T>
+bool TimingResistantEqual(const T& a, const T& b)
+{
+    if (b.size() == 0) return a.size() == 0;
+    size_t accumulator = a.size() ^ b.size();
+    for (size_t i = 0; i < a.size(); i++)
+        accumulator |= a[i] ^ b[i%b.size()];
+    return accumulator == 0;
+}
 
 /** Median filter over a stream of values.
  * Returns the median of the last N numbers
@@ -489,8 +512,6 @@ public:
     }
 };
 
-bool NewThread(void(*pfn)(void*), void* parg);
-
 #ifdef WIN32
 inline void SetThreadPriority(int nPriority)
 {
@@ -498,10 +519,14 @@ inline void SetThreadPriority(int nPriority)
 }
 #else
 
+// PRIO_MAX is not defined on Solaris
+#ifndef PRIO_MAX
+    #define PRIO_MAX 20
+#endif
 #define THREAD_PRIORITY_LOWEST          PRIO_MAX
 #define THREAD_PRIORITY_BELOW_NORMAL    2
 #define THREAD_PRIORITY_NORMAL          0
-#define THREAD_PRIORITY_ABOVE_NORMAL    0
+#define THREAD_PRIORITY_ABOVE_NORMAL    (-2)
 
 inline void SetThreadPriority(int nPriority)
 {
@@ -512,11 +537,6 @@ inline void SetThreadPriority(int nPriority)
 #else
     setpriority(PRIO_PROCESS, 0, nPriority);
 #endif
-}
-
-inline void ExitThread(size_t nExitCode)
-{
-    pthread_exit((void*)nExitCode);
 }
 #endif
 

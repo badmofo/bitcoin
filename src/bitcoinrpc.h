@@ -19,6 +19,16 @@ class CReserveKey;
 
 #include "util.h"
 
+class AcceptedConnection
+{
+public:
+    virtual ~AcceptedConnection() {}
+
+    virtual std::iostream& stream() = 0;
+    virtual std::string peer_address_to_string() const = 0;
+    virtual void close() = 0;
+};
+
 // HTTP status codes
 enum HTTPStatusCode
 {
@@ -89,6 +99,12 @@ void RPCTypeCheck(const json_spirit::Array& params,
 void RPCTypeCheck(const json_spirit::Object& o,
                   const std::map<std::string, json_spirit::Value_type>& typesExpected, bool fAllowNull=false);
 
+/*
+  Run func nSeconds from now. Uses boost deadline timers.
+  Overrides previous timer <name> (if any).
+ */
+void RPCRunLater(const std::string& name, boost::function<void(void)> func, int64 nSeconds);
+
 typedef json_spirit::Value(*rpcfn_type)(const json_spirit::Array& params, bool fHelp);
 
 class CRPCCommand
@@ -123,7 +139,9 @@ public:
 };
 
 extern const CRPCTable tableRPC;
-extern CReserveKey* pMiningKey;
+
+extern void InitRPCMining();
+extern void ShutdownRPCMining();
 
 extern int64 nWalletUnlockTime;
 extern int64 AmountFromValue(const json_spirit::Value& value);
@@ -133,12 +151,19 @@ extern std::string HexBits(unsigned int nBits);
 extern std::string HelpRequiringPassphrase();
 extern void EnsureWalletIsUnlocked();
 
+extern std::string HTTPReply(int nStatus, const std::string& strMsg,
+                             bool keepalive, bool headerOnly = false,
+                             const char *contentType = "application/json");
+
 extern json_spirit::Value getconnectioncount(const json_spirit::Array& params, bool fHelp); // in rpcnet.cpp
 extern json_spirit::Value getpeerinfo(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value addnode(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getaddednodeinfo(const json_spirit::Array& params, bool fHelp);
+
 extern json_spirit::Value dumpprivkey(const json_spirit::Array& params, bool fHelp); // in rpcdump.cpp
 extern json_spirit::Value importprivkey(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value dumpwallet(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value importwallet(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value getgenerate(const json_spirit::Array& params, bool fHelp); // in rpcmining.cpp
 extern json_spirit::Value setgenerate(const json_spirit::Array& params, bool fHelp);
@@ -190,6 +215,7 @@ extern json_spirit::Value signrawtransaction(const json_spirit::Array& params, b
 extern json_spirit::Value sendrawtransaction(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value getblockcount(const json_spirit::Array& params, bool fHelp); // in rpcblockchain.cpp
+extern json_spirit::Value getbestblockhash(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getdifficulty(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value settxfee(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getrawmempool(const json_spirit::Array& params, bool fHelp);
@@ -197,5 +223,12 @@ extern json_spirit::Value getblockhash(const json_spirit::Array& params, bool fH
 extern json_spirit::Value getblock(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value gettxoutsetinfo(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value gettxout(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value verifychain(const json_spirit::Array& params, bool fHelp);
+
+// in rest.cpp
+extern bool HTTPReq_REST(AcceptedConnection *conn,
+                  std::string& strURI,
+                  std::map<std::string, std::string>& mapHeaders,
+                  bool fRun);
 
 #endif

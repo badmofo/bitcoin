@@ -33,6 +33,7 @@ TESTLIBS += \
 LIBS += \
  $(DEPSDIR)/lib/db48/libdb_cxx-4.8.a \
  $(DEPSDIR)/lib/libboost_system-mt.a \
+ $(DEPSDIR)/lib/libboost_regex-mt.a \
  $(DEPSDIR)/lib/libboost_filesystem-mt.a \
  $(DEPSDIR)/lib/libboost_program_options-mt.a \
  $(DEPSDIR)/lib/libboost_thread-mt.a \
@@ -46,6 +47,7 @@ TESTLIBS += \
 LIBS += \
  -ldb_cxx-4.8 \
  -lboost_system-mt \
+ -lboost_regex-mt \
  -lboost_filesystem-mt \
  -lboost_program_options-mt \
  -lboost_thread-mt \
@@ -82,11 +84,15 @@ OBJS= \
     obj/key.o \
     obj/db.o \
     obj/init.o \
+    obj/bitcoind.o \
     obj/keystore.o \
+    obj/core.o \
     obj/main.o \
+    obj/miner.o \
     obj/net.o \
     obj/protocol.o \
     obj/bitcoinrpc.o \
+    obj/rest.o \
     obj/rpcdump.o \
     obj/rpcnet.o \
     obj/rpcmining.o \
@@ -102,7 +108,8 @@ OBJS= \
     obj/bloom.o \
     obj/noui.o \
     obj/leveldb.o \
-    obj/txdb.o
+    obj/txdb.o \
+    obj/chainparams.o
 
 ifndef USE_UPNP
 	override USE_UPNP = -
@@ -162,7 +169,7 @@ obj-test/%.o: test/%.cpp
 	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
 	  rm -f $(@:%.o=%.d)
 
-test_bitcoin: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
+test_bitcoin: $(TESTOBJS) $(filter-out obj/init.o obj/bitcoind.o,$(OBJS:obj/%=obj/%))
 	$(CXX) $(CFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS) $(TESTLIBS)
 
 clean:

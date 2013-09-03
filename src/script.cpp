@@ -2,21 +2,21 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#include "script.h"
+#include "core.h"
+#include "keystore.h"
+#include "bignum.h"
+#include "key.h"
+#include "sync.h"
+#include "util.h"
+
 #include <boost/foreach.hpp>
 #include <boost/tuple/tuple.hpp>
 
 using namespace std;
 using namespace boost;
 
-#include "script.h"
-#include "keystore.h"
-#include "bignum.h"
-#include "key.h"
-#include "main.h"
-#include "sync.h"
-#include "util.h"
-
-bool CheckSig(vector<unsigned char> vchSig, vector<unsigned char> vchPubKey, CScript scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType, int flags);
+bool CheckSig(vector<unsigned char> vchSig, const vector<unsigned char> &vchPubKey, const CScript &scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType, int flags);
 
 
 
@@ -227,7 +227,10 @@ const char* GetOpName(opcodetype opcode)
     }
 }
 
-bool IsCanonicalPubKey(const valtype &vchPubKey) {
+bool IsCanonicalPubKey(const valtype &vchPubKey, unsigned int flags) {
+    if (!(flags & SCRIPT_VERIFY_STRICTENC))
+        return true;
+
     if (vchPubKey.size() < 33)
         return error("Non-canonical public key: too short");
     if (vchPubKey[0] == 0x04) {
@@ -242,7 +245,10 @@ bool IsCanonicalPubKey(const valtype &vchPubKey) {
     return true;
 }
 
-bool IsCanonicalSignature(const valtype &vchSig) {
+bool IsCanonicalSignature(const valtype &vchSig, unsigned int flags) {
+    if (!(flags & SCRIPT_VERIFY_STRICTENC))
+        return true;
+
     // See https://bitcointalk.org/index.php?topic=8392.msg127623#msg127623
     // A canonical signature exists of: <30> <total len> <02> <len R> <R> <02> <len S> <S> <hashtype>
     // Where R and S are not negative (their first byte has its highest bit not set), and not
@@ -286,6 +292,11 @@ bool IsCanonicalSignature(const valtype &vchSig) {
     if (nLenS > 1 && (S[0] == 0x00) && !(S[1] & 0x80))
         return error("Non-canonical signature: S value excessively padded");
 
+    if (flags & SCRIPT_VERIFY_EVEN_S) {
+        if (S[nLenS-1] & 1)
+            return error("Non-canonical signature: S value odd");
+    }
+
     return true;
 }
 
@@ -302,7 +313,6 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, co
     if (script.size() > 10000)
         return false;
     int nOpCount = 0;
-    bool fStrictEncodings = flags & SCRIPT_VERIFY_STRICTENC;
 
     try
     {
@@ -317,6 +327,8 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, co
                 return false;
             if (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE)
                 return false;
+
+            // Note how OP_RESERVED does not count towards the opcode limit.
             if (opcode > OP_16 && ++nOpCount > 201)
                 return false;
 
@@ -841,9 +853,8 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, co
                     // Drop the signature, since there's no way for a signature to sign itself
                     scriptCode.FindAndDelete(CScript(vchSig));
 
-                    bool fSuccess = (!fStrictEncodings || (IsCanonicalSignature(vchSig) && IsCanonicalPubKey(vchPubKey)));
-                    if (fSuccess)
-                        fSuccess = CheckSig(vchSig, vchPubKey, scriptCode, txTo, nIn, nHashType, flags);
+                    bool fSuccess = IsCanonicalSignature(vchSig, flags) && IsCanonicalPubKey(vchPubKey, flags) &&
+                        CheckSig(vchSig, vchPubKey, scriptCode, txTo, nIn, nHashType, flags);
 
                     popstack(stack);
                     popstack(stack);
@@ -903,9 +914,8 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, co
                         valtype& vchPubKey = stacktop(-ikey);
 
                         // Check signature
-                        bool fOk = (!fStrictEncodings || (IsCanonicalSignature(vchSig) && IsCanonicalPubKey(vchPubKey)));
-                        if (fOk)
-                            fOk = CheckSig(vchSig, vchPubKey, scriptCode, txTo, nIn, nHashType, flags);
+                        bool fOk = IsCanonicalSignature(vchSig, flags) && IsCanonicalPubKey(vchPubKey, flags) &&
+                            CheckSig(vchSig, vchPubKey, scriptCode, txTo, nIn, nHashType, flags);
 
                         if (fOk) {
                             isig++;
@@ -1033,13 +1043,13 @@ class CSignatureCache
 {
 private:
      // sigdata_type is (signature hash, signature, public key):
-    typedef boost::tuple<uint256, std::vector<unsigned char>, std::vector<unsigned char> > sigdata_type;
+    typedef boost::tuple<uint256, std::vector<unsigned char>, CPubKey> sigdata_type;
     std::set< sigdata_type> setValid;
     boost::shared_mutex cs_sigcache;
 
 public:
     bool
-    Get(uint256 hash, const std::vector<unsigned char>& vchSig, const std::vector<unsigned char>& pubKey)
+    Get(const uint256 &hash, const std::vector<unsigned char>& vchSig, const CPubKey& pubKey)
     {
         boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
 
@@ -1050,7 +1060,7 @@ public:
         return false;
     }
 
-    void Set(uint256 hash, const std::vector<unsigned char>& vchSig, const std::vector<unsigned char>& pubKey)
+    void Set(const uint256 &hash, const std::vector<unsigned char>& vchSig, const CPubKey& pubKey)
     {
         // DoS prevention: limit cache size to less than 10MB
         // (~200 bytes per cache entry times 50,000 entries)
@@ -1081,10 +1091,14 @@ public:
     }
 };
 
-bool CheckSig(vector<unsigned char> vchSig, vector<unsigned char> vchPubKey, CScript scriptCode,
+bool CheckSig(vector<unsigned char> vchSig, const vector<unsigned char> &vchPubKey, const CScript &scriptCode,
               const CTransaction& txTo, unsigned int nIn, int nHashType, int flags)
 {
     static CSignatureCache signatureCache;
+
+    CPubKey pubkey(vchPubKey);
+    if (!pubkey.IsValid())
+        return false;
 
     // Hash type is one byte tacked on to the end of the signature
     if (vchSig.empty())
@@ -1097,18 +1111,14 @@ bool CheckSig(vector<unsigned char> vchSig, vector<unsigned char> vchPubKey, CSc
 
     uint256 sighash = SignatureHash(scriptCode, txTo, nIn, nHashType);
 
-    if (signatureCache.Get(sighash, vchSig, vchPubKey))
+    if (signatureCache.Get(sighash, vchSig, pubkey))
         return true;
 
-    CKey key;
-    if (!key.SetPubKey(vchPubKey))
-        return false;
-
-    if (!key.Verify(sighash, vchSig))
+    if (!pubkey.Verify(sighash, vchSig))
         return false;
 
     if (!(flags & SCRIPT_VERIFY_NOCACHE))
-        signatureCache.Set(sighash, vchSig, vchPubKey);
+        signatureCache.Set(sighash, vchSig, pubkey);
 
     return true;
 }
@@ -1163,7 +1173,7 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
         // Compare
         CScript::const_iterator pc1 = script1.begin();
         CScript::const_iterator pc2 = script2.begin();
-        loop
+        while (true)
         {
             if (pc1 == script1.end() && pc2 == script2.end())
             {
@@ -1477,6 +1487,42 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
     return true;
 }
 
+class CAffectedKeysVisitor : public boost::static_visitor<void> {
+private:
+    const CKeyStore &keystore;
+    std::vector<CKeyID> &vKeys;
+
+public:
+    CAffectedKeysVisitor(const CKeyStore &keystoreIn, std::vector<CKeyID> &vKeysIn) : keystore(keystoreIn), vKeys(vKeysIn) {}
+
+    void Process(const CScript &script) {
+        txnouttype type;
+        std::vector<CTxDestination> vDest;
+        int nRequired;
+        if (ExtractDestinations(script, type, vDest, nRequired)) {
+            BOOST_FOREACH(const CTxDestination &dest, vDest)
+                boost::apply_visitor(*this, dest);
+        }
+    }
+
+    void operator()(const CKeyID &keyId) {
+        if (keystore.HaveKey(keyId))
+            vKeys.push_back(keyId);
+    }
+
+    void operator()(const CScriptID &scriptId) {
+        CScript script;
+        if (keystore.GetCScript(scriptId, script))
+            Process(script);
+    }
+
+    void operator()(const CNoDestination &none) {}
+};
+
+void ExtractAffectedKeys(const CKeyStore &keystore, const CScript& scriptPubKey, std::vector<CKeyID> &vKeys) {
+    CAffectedKeysVisitor(keystore, vKeys).Process(scriptPubKey);
+}
+
 bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const CTransaction& txTo, unsigned int nIn,
                   unsigned int flags, int nHashType)
 {
@@ -1773,13 +1819,13 @@ void CScript::SetDestination(const CTxDestination& dest)
     boost::apply_visitor(CScriptVisitor(this), dest);
 }
 
-void CScript::SetMultisig(int nRequired, const std::vector<CKey>& keys)
+void CScript::SetMultisig(int nRequired, const std::vector<CPubKey>& keys)
 {
     this->clear();
 
     *this << EncodeOP_N(nRequired);
-    BOOST_FOREACH(const CKey& key, keys)
-        *this << key.GetPubKey();
+    BOOST_FOREACH(const CPubKey& key, keys)
+        *this << key;
     *this << EncodeOP_N(keys.size()) << OP_CHECKMULTISIG;
 }
 
@@ -1804,20 +1850,17 @@ bool CScriptCompressor::IsToScriptID(CScriptID &hash) const
     return false;
 }
 
-bool CScriptCompressor::IsToPubKey(std::vector<unsigned char> &pubkey) const
+bool CScriptCompressor::IsToPubKey(CPubKey &pubkey) const
 {
     if (script.size() == 35 && script[0] == 33 && script[34] == OP_CHECKSIG
                             && (script[1] == 0x02 || script[1] == 0x03)) {
-        pubkey.resize(33);
-        memcpy(&pubkey[0], &script[1], 33);
+        pubkey.Set(&script[1], &script[34]);
         return true;
     }
     if (script.size() == 67 && script[0] == 65 && script[66] == OP_CHECKSIG
                             && script[1] == 0x04) {
-        pubkey.resize(65);
-        memcpy(&pubkey[0], &script[1], 65);
-        CKey key;
-        return (key.SetPubKey(CPubKey(pubkey))); // SetPubKey fails if this is not a valid public key, a case that would not be compressible
+        pubkey.Set(&script[1], &script[66]);
+        return pubkey.IsFullyValid(); // if not fully valid, a case that would not be compressible
     }
     return false;
 }
@@ -1838,7 +1881,7 @@ bool CScriptCompressor::Compress(std::vector<unsigned char> &out) const
         memcpy(&out[1], &scriptID, 20);
         return true;
     }
-    std::vector<unsigned char> pubkey;
+    CPubKey pubkey;
     if (IsToPubKey(pubkey)) {
         out.resize(33);
         memcpy(&out[1], &pubkey[1], 32);
@@ -1891,17 +1934,16 @@ bool CScriptCompressor::Decompress(unsigned int nSize, const std::vector<unsigne
         return true;
     case 0x04:
     case 0x05:
-        std::vector<unsigned char> vch(33, 0x00);
+        unsigned char vch[33] = {};
         vch[0] = nSize - 2;
         memcpy(&vch[1], &in[0], 32);
-        CKey key;
-        if (!key.SetPubKey(CPubKey(vch)))
+        CPubKey pubkey(&vch[0], &vch[33]);
+        if (!pubkey.Decompress())
             return false;
-        key.SetCompressedPubKey(false); // Decompress public key
-        CPubKey pubkey = key.GetPubKey();
+        assert(pubkey.size() == 65);
         script.resize(67);
         script[0] = 65;
-        memcpy(&script[1], &pubkey.Raw()[0], 65);
+        memcpy(&script[1], pubkey.begin(), 65);
         script[66] = OP_CHECKSIG;
         return true;
     }

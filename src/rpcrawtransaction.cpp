@@ -9,7 +9,6 @@
 #include "bitcoinrpc.h"
 #include "db.h"
 #include "init.h"
-#include "main.h"
 #include "net.h"
 #include "wallet.h"
 
@@ -230,7 +229,7 @@ Value listunspent(const Array& params, bool fHelp)
         {
             entry.push_back(Pair("address", CBitcoinAddress(address).ToString()));
             if (pwalletMain->mapAddressBook.count(address))
-                entry.push_back(Pair("account", pwalletMain->mapAddressBook[address]));
+                entry.push_back(Pair("account", pwalletMain->mapAddressBook[address].name));
         }
         entry.push_back(Pair("scriptPubKey", HexStr(pk.begin(), pk.end())));
         if (pk.IsPayToScriptHash())
@@ -407,10 +406,7 @@ Value signrawtransaction(const Array& params, bool fHelp)
             bool fGood = vchSecret.SetString(k.get_str());
             if (!fGood)
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
-            CKey key;
-            bool fCompressed;
-            CSecret secret = vchSecret.GetSecret(fCompressed);
-            key.SetSecret(secret, fCompressed);
+            CKey key = vchSecret.GetKey();
             tempKeystore.AddKey(key);
         }
     }
@@ -558,7 +554,7 @@ Value sendrawtransaction(const Array& params, bool fHelp)
         if (!fHave) {
             // push to local node
             CValidationState state;
-            if (!tx.AcceptToMemoryPool(state, true, false))
+            if (!mempool.accept(state, tx, false, NULL))
                 throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX rejected"); // TODO: report validation state
         }
     }

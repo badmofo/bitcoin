@@ -20,6 +20,7 @@ class TransactionView;
 class OverviewPage;
 class AddressBookPage;
 class SendCoinsDialog;
+class SendCoinsRecipient;
 class SignVerifyMessageDialog;
 class Notificator;
 class RPCConsole;
@@ -40,6 +41,7 @@ QT_END_NAMESPACE
 class WalletStack : public QStackedWidget
 {
     Q_OBJECT
+
 public:
     explicit WalletStack(QWidget *parent = 0);
     ~WalletStack();
@@ -53,7 +55,7 @@ public:
 
     void removeAllWallets();
 
-    bool handleURI(const QString &uri);
+    bool handlePaymentRequest(const SendCoinsRecipient &recipient);
 
     void showOutOfSyncWarning(bool fShow);
 
@@ -65,7 +67,7 @@ private:
     bool bOutOfSync;
 
 public slots:
-    void setCurrentWallet(const QString& name);
+    bool setCurrentWallet(const QString& name);
 
     /** Switch to overview (home) page */
     void gotoOverviewPage();
