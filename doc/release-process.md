@@ -17,11 +17,11 @@ Release Process
 
 ###tag version in git
 
-	git tag -a v0.8.0
+	git tag -a v(new version, e.g. 0.8.0)
 
 ###write release notes. git shortlog helps a lot, for example:
 
-	git shortlog --no-merges v0.7.2..v0.8.0
+	git shortlog --no-merges v(current version, e.g. 0.7.2)..v(new version, e.g. 0.8.0)
 
 * * *
 
@@ -30,8 +30,8 @@ Release Process
  From a directory containing the bitcoin source, gitian-builder and gitian.sigs
   
 	export SIGNER=(your gitian key, ie bluematt, sipa, etc)
-	export VERSION=0.8.0
-	cd ./gitian-builder
+	export VERSION=(new version, e.g. 0.8.0)
+	pushd ./gitian-builder
 
  Fetch and build inputs: (first time, or when dependency versions change)
 
@@ -58,13 +58,14 @@ Release Process
 	./bin/gsign --signer $SIGNER --release ${VERSION} --destination ../gitian.sigs/ ../bitcoin/contrib/gitian-descriptors/gitian.yml
 	pushd build/out
 	zip -r bitcoin-${VERSION}-linux-gitian.zip *
-	mv bitcoin-${VERSION}-linux-gitian.zip ../../
+	mv bitcoin-${VERSION}-linux-gitian.zip ../../../
 	popd
 	./bin/gbuild --commit bitcoin=v${VERSION} ../bitcoin/contrib/gitian-descriptors/gitian-win32.yml
 	./bin/gsign --signer $SIGNER --release ${VERSION}-win32 --destination ../gitian.sigs/ ../bitcoin/contrib/gitian-descriptors/gitian-win32.yml
 	pushd build/out
 	zip -r bitcoin-${VERSION}-win32-gitian.zip *
-	mv bitcoin-${VERSION}-win32-gitian.zip ../../
+	mv bitcoin-${VERSION}-win32-gitian.zip ../../../
+	popd
 	popd
 
   Build output expected:
@@ -134,7 +135,7 @@ Commit your signature to gitian.sigs:
 
 From a directory containing bitcoin source, gitian.sigs and gitian zips
 
-	export VERSION=0.5.1
+	export VERSION=(new version, e.g. 0.8.0)
 	mkdir bitcoin-${VERSION}-linux-gitian
 	pushd bitcoin-${VERSION}-linux-gitian
 	unzip ../bitcoin-${VERSION}-linux-gitian.zip

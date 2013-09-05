@@ -11,14 +11,16 @@
 
 class BitcoinGUI;
 class ClientModel;
+class SendCoinsRecipient;
 class WalletModel;
 class WalletStack;
 
 class WalletFrame : public QFrame
 {
     Q_OBJECT
+
 public:
-    explicit WalletFrame(BitcoinGUI *_gui);
+    explicit WalletFrame(BitcoinGUI *_gui = 0);
     ~WalletFrame();
 
     void setClientModel(ClientModel *clientModel);
@@ -28,13 +30,11 @@ public:
 
     void removeAllWallets();
 
-    bool handleURI(const QString &uri);
+    bool handlePaymentRequest(const SendCoinsRecipient& recipient);
 
     void showOutOfSyncWarning(bool fShow);
 
 private:
-    BitcoinGUI *gui;
-    ClientModel *clientModel;
     WalletStack *walletStack;
 
 public slots:
