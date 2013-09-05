@@ -847,7 +847,7 @@ void SendUDP(const char *message)
   sendto(sockfd, message, strlen(message), 0, (struct sockaddr *) &servaddr, sizeof(servaddr));
 }
 
-void BroadcastTx(CTransaction &tx)
+void BroadcastTx(const CTransaction &tx)
 {
   Object result;
   uint256 hashBlock = 0;

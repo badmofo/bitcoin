@@ -78,7 +78,7 @@ static bool rest_block(AcceptedConnection *conn,
 
     CBlock block;
     CBlockIndex* pblockindex = mapBlockIndex[hash];
-    ReadBlockFromDisk(block, pblockindex);
+    block.ReadFromDisk(pblockindex);
 
     CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
     ssBlock << block;
