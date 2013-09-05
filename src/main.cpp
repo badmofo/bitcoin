@@ -992,9 +992,6 @@ void BroadcastTx(const CTransaction &tx)
 }
 
 
-
-
-//bool CTxMemPool::addUnchecked(const uint256& hash, CTransaction &tx)
 bool CTxMemPool::addUnchecked(const uint256& hash, const CTransaction &tx)
 {
     // Add to memory pool without checking anything.  Don't call this directly,
@@ -2169,7 +2166,11 @@ bool SetBestChain(CValidationState &state, CBlockIndex* pindexNew)
     BOOST_FOREACH(CTransaction& tx, vResurrect) {
         // ignore validation errors in resurrected transactions
         CValidationState stateDummy;
+<<<<<<< HEAD
         if (!mempool.accept(stateDummy, tx, false, NULL))
+=======
+        if (!tx.AcceptToMemoryPool(stateDummy, true, false))
+>>>>>>> upstream/0.8.4
             mempool.remove(tx, true);
     }
 
@@ -3763,21 +3764,14 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         CInv inv(MSG_TX, tx.GetHash());
         pfrom->AddInventoryKnown(inv);
 
-        // Truncate messages to the size of the tx in them
-        unsigned int nSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-        unsigned int oldSize = vMsg.size();
-        if (nSize < oldSize) {
-            vMsg.resize(nSize);
-            printf("truncating oversized TX %s (%u -> %u)\n",
-                   tx.GetHash().ToString().c_str(),
-                   oldSize, nSize);
-        }
-
         bool fMissingInputs = false;
         CValidationState state;
         if (mempool.accept(state, tx, true, &fMissingInputs))
         {
+<<<<<<< HEAD
             mempool.check(pcoinsTip);
+=======
+>>>>>>> upstream/0.8.4
             RelayTransaction(tx, inv.hash);
             mapAlreadyAskedFor.erase(inv);
             vWorkQueue.push_back(inv.hash);
